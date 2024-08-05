@@ -1,6 +1,5 @@
 FROM python:3.9-slim
 
-# Mettre à jour le système et installer les dépendances
 RUN apt-get update && apt-get upgrade -y && apt-get install -y \
     libexpat1 \
     libgssapi-krb5-2 \
@@ -15,6 +14,7 @@ COPY requirements.txt /tmp/
 
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && \
     pip install --upgrade pip && \
+    pip install --upgrade Werkzeug==3.0.3 && \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
