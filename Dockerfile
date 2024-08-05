@@ -1,4 +1,4 @@
-FROM python:3.11.4
+FROM python:3.6
 
 COPY requirements.txt /tmp/
 
