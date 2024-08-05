@@ -1,28 +1,50 @@
 pipeline {
     agent any 
     environment {
-    DOCKERHUB_CREDENTIALS = credentials('karim-dockerhub')
+        DOCKERHUB_CREDENTIALS = credentials('karim-dockerhub')
+        APP_NAME = "jobordeau/myapp-flask"
     }
     stages { 
-
+        stage('SCM Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/jobordeau/tp5.git'
+            }
+        }
         stage('Build docker image') {
             steps {  
-                sh 'docker build -t myapp/flask:$BUILD_NUMBER .'
+                sh 'docker build -t $APP_NAME:$BUILD_NUMBER .'
+            }
+        }
+        stage('Scan Docker Image') {
+            steps {
+                script {
+                    def trivyOutput = sh(script: "trivy image --severity HIGH,CRITICAL $APP_NAME:$BUILD_NUMBER", returnStdout: true).trim()
+                    println trivyOutput
+                    if (trivyOutput.contains("Total: 0")) {
+                        echo "No vulnerabilities found in the Docker image."
+                    } else {
+                        echo "Vulnerabilities found in the Docker image."
+                        error "Vulnerabilities found in the Docker image."
+                    }
+                }
             }
         }
         stage('login to dockerhub') {
-            steps{
-                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'karim-dockerhub', passwordVariable: 'DOCKERHUB_PASSWORD', usernameVariable: 'DOCKERHUB_USERNAME')]) {
+                        sh 'echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin'
+                    }
+                }
             }
         }
         stage('push image') {
-            steps{
-                sh 'docker tag myapp/flask:$BUILD_NUMBER jobordeau/myapp-flask:$BUILD_NUMBER'
-                sh 'docker push jobordeau/myapp-flask:$BUILD_NUMBER'
+            steps {
+                sh 'docker push $APP_NAME:$BUILD_NUMBER'
             }
         }
-}
-post {
+    }
+    post {
         always {
             sh 'docker logout'
         }
