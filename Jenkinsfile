@@ -2,7 +2,12 @@ pipeline {
     agent any 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('karim-dockerhub')
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
         APP_NAME = "jobordeau/myapp-flask"
+    }
+    parameters {
+        booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically run apply after generating plan?')
     }
     stages { 
         stage('SCM Checkout') {
@@ -44,6 +49,41 @@ pipeline {
         stage('push image') {
             steps {
                 sh 'docker push $APP_NAME:$BUILD_NUMBER'
+            }
+        }
+        stage('Terraform Checkout') {
+            steps {
+                script {
+                    dir("terraform") {
+                        git branch: 'main', url: 'https://github.com/jobordeau/tp6.git'
+                    }
+                }
+            }
+        }
+        stage('Terraform Init and Plan') {
+            steps {
+                sh 'cd terraform && terraform init'
+                sh 'cd terraform && terraform plan -out tfplan'
+                sh 'cd terraform && terraform show -no-color tfplan > tfplan.txt'
+            }
+        }
+        stage('Terraform Approval') {
+            when {
+                not {
+                    equals expected: true, actual: params.autoApprove
+                }
+            }
+            steps {
+                script {
+                    def plan = readFile 'terraform/tfplan.txt'
+                    input message: "Do you want to apply the plan?",
+                    parameters: [text(name: 'Plan', description: 'Please review the plan', defaultValue: plan)]
+                }
+            }
+        }
+        stage('Terraform Apply') {
+            steps {
+                sh 'cd terraform && terraform apply -input=false tfplan'
             }
         }
     }
