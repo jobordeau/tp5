@@ -1,11 +1,13 @@
-FROM python:3.6
+FROM python:3.9-slim
 
-RUN pip install flask
+COPY requirements.txt /tmp/
+
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY . /opt/
 
-EXPOSE 8081
-
 WORKDIR /opt
+
+EXPOSE 8081
 
 ENTRYPOINT ["python", "app.py"]
